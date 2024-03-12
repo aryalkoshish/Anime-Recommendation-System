@@ -9,7 +9,7 @@
 ### Team Members
 | S.N. | Name | Email | GitHub |
 |------|------|-------|--------|
-| 1. | Kosish Aryal | C0907650@mylambton.ca | [aryalkoshish](https://github.com/aryalkoshish)|
+| 1. | Koshish Aryal | C0907650@mylambton.ca | [aryalkoshish](https://github.com/aryalkoshish)|
 | 2. | Anil Poudel | C0900334@mylambton.ca | [pdlanil](https://github.com/pdlanil)|
 | 3. | Punam Bhattarai | C0894222@mylambton.ca | 
 | 4. | Bipin Pandey | C0907008@mylambton.ca |
