@@ -15,6 +15,6 @@
 | 4. | Bipin Pandey | C0907008@mylambton.ca |
 | 5. | Suresh Mahat | C0900890@mylambton.ca |
 | 6. | Shweta Laljibhai Thummar | C0895973@mylambton.ca |
-| 7. | Uttam Tamang | C0907669@mylambton.ca |
+| 7. | Uttam Tamang | C0907669@mylambton.ca | [uttamtamang](https://github.com/uttamtamang)
 
 ## Project Description
