@@ -1,4 +1,2 @@
-data\animes.csv
-data\profiles.csv
-data\reviews.csv
-.ipynb_checkpoints
+dir_to_ignore/data
+dir_to_ignore/.ipynb_checkpoints
