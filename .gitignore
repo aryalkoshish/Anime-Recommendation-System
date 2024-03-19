@@ -1,2 +1,4 @@
-dir_to_ignore/data
-dir_to_ignore/.ipynb_checkpoints
+.ipynb_checkpoints
+data/animes.csv
+data/reviews.csv
+data/profiles.csv
