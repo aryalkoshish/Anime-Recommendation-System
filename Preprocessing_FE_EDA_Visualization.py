@@ -14,6 +14,11 @@ from textblob import TextBlob
 from gensim.models import Word2Vec
 import matplotlib.pyplot as plt
 import seaborn as sns
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.svm import SVC
+from sklearn.model_selection import train_test_split
 
 try:
     _create_unverified_https_context = ssl._create_unverified_context
@@ -29,7 +34,7 @@ nltk.download('vader_lexicon')
 
 review_df = pd.read_csv('/Users/shweta/Downloads/Anime_3014/reviews.csv')
 abbreviation_mapping_df = pd.read_csv('/Users/shweta/Downloads/slangs.csv')
-review_df_subset = review_df.iloc[:5000]
+review_df_subset = review_df.iloc[:15000]
 
 # Create a dictionary from the DataFrame
 abbreviation_mapping = dict(zip(abbreviation_mapping_df['Abbr'], abbreviation_mapping_df['Fullform']))
@@ -241,8 +246,6 @@ review_df_subset['num_sentences'] = review_df_subset['preprocessed_text'].apply(
 review_df_subset['polarity'], review_df_subset['subjectivity'] = zip(*review_df_subset['preprocessed_text'].apply(get_sentiment_scores))
 review_df_subset['word_embeddings'] = review_df_subset['preprocessed_text'].apply(average_word_embedding)
 
-review_df_subset.to_csv('/Users/shweta/Downloads/review_df_subset_embedding.csv', index=False)
-
 # Vectorize the text data using TF-IDF
 tfidf_vectorizer = TfidfVectorizer()
 tfidf_matrix = tfidf_vectorizer.fit_transform(review_df_subset['preprocessed_text'])
@@ -263,13 +266,11 @@ plt.figure(figsize=(10, 5))
 plt.subplot(1, 2, 1)
 plt.scatter(pca_result[:, 0], pca_result[:, 1], c=review_df_subset['sentiment'].map(color_map))
 plt.title('PCA')
-#plt.savefig('/Users/shweta/Downloads/Anime_3014/PCA.png')
 
 # Plot t-SNE result
 plt.subplot(1, 2, 2)
 plt.scatter(tsne_result[:, 0], tsne_result[:, 1], c=review_df_subset['sentiment'].map(color_map))
 plt.title('t-SNE')
-#plt.savefig('/Users/shweta/Downloads/Anime_3014/tSNE.png')
 plt.show()
 
 plt.figure(figsize=(8, 6))
@@ -297,6 +298,45 @@ plt.title('Box Plot of Sentiment Scores')
 plt.ylabel('Sentiment Score')
 plt.show()
 
+X = review_df_subset['preprocessed_text']  # Text data
+y = review_df_subset['sentiment']  # Sentiment labels
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-review_df_subset.to_csv('/Users/shweta/Downloads/review_df_subset_blob.csv', index=False)
+tfidf_vectorizer = TfidfVectorizer(max_features=5000)
+X_train_tfidf = tfidf_vectorizer.fit_transform(X_train)
+X_test_tfidf = tfidf_vectorizer.transform(X_test)
+
+# Naive Bayes
+model = MultinomialNB()
+
+model.fit(X_train_tfidf, y_train)
+
+y_pred = model.predict(X_test_tfidf)
+
+accuracy = accuracy_score(y_test, y_pred)
+precision = precision_score(y_test, y_pred, average='weighted')
+recall = recall_score(y_test, y_pred, average='weighted')
+f1 = f1_score(y_test, y_pred, average='weighted')
+
+print("Accuracy:", accuracy)
+print("Precision:", precision)
+print("Recall:", recall)
+print("F1-score:", f1)
+
+# Support Vector Machines (SVM) algorithm
+svm_model = SVC(kernel='linear')
+
+svm_model.fit(X_train_tfidf, y_train)
+
+y_pred_svm = svm_model.predict(X_test_tfidf)
+
+accuracy_svm = accuracy_score(y_test, y_pred_svm)
+precision_svm = precision_score(y_test, y_pred_svm, average='weighted')
+recall_svm = recall_score(y_test, y_pred_svm, average='weighted')
+f1_svm = f1_score(y_test, y_pred_svm, average='weighted')
+
+print("SVM Accuracy:", accuracy_svm)
+print("SVM Precision:", precision_svm)
+print("SVM Recall:", recall_svm)
+print("SVM F1-score:", f1_svm)
 
