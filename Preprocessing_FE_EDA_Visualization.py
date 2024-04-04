@@ -340,3 +340,44 @@ print("SVM Precision:", precision_svm)
 print("SVM Recall:", recall_svm)
 print("SVM F1-score:", f1_svm)
 
+# Topic modeling with LDA
+lda_model = LatentDirichletAllocation(n_components=5, random_state=42)
+lda_topics = lda_model.fit_transform(tfidf_matrix)
+
+# Visualize topics with word clouds
+def visualize_topics(lda_model, feature_names, n_words=20):
+    for idx, topic in enumerate(lda_model.components_):
+        # Get top words for each topic
+        top_words_idx = topic.argsort()[:-n_words - 1:-1]
+        top_words = [feature_names[i] for i in top_words_idx]
+
+        # Create word cloud for each topic
+        wordcloud = WordCloud(width=800, height=400, background_color='white').generate(' '.join(top_words))
+
+        # Plot word cloud
+        plt.figure(figsize=(10, 5))
+        plt.imshow(wordcloud, interpolation='bilinear')
+        plt.title(f'Topic {idx + 1}')
+        plt.axis('off')
+        plt.show()
+
+# Visualize topics using word clouds
+visualize_topics(lda_model, tfidf_vectorizer.get_feature_names_out())
+
+# Calculate average sentiment score for each topic
+topic_sentiment = []
+for topic_idx, topic in enumerate(lda_topics):
+    top_reviews_idx = topic.argsort()[-10:]  # Example: Top 10 reviews for each topic
+    topic_reviews = review_df_subset.iloc[top_reviews_idx]
+    avg_sentiment = topic_reviews['polarity'].mean()
+    topic_sentiment.append(avg_sentiment)
+
+# Visualize sentiment scores for topics
+plt.figure(figsize=(8, 5))
+plt.bar(range(len(topic_sentiment)), topic_sentiment, color='skyblue')
+plt.xlabel('Topic')
+plt.ylabel('Average Sentiment Score')
+plt.title('Sentiment Scores for Topics')
+plt.xticks(range(len(topic_sentiment)), [f'Topic {i+1}' for i in range(len(topic_sentiment))])
+plt.show()
+
