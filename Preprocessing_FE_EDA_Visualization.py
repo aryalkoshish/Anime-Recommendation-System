@@ -38,9 +38,6 @@ review_df = pd.read_csv('/Users/shweta/Downloads/Anime_3014/reviews.csv')
 abbreviation_mapping_df = pd.read_csv('/Users/shweta/Downloads/slangs.csv')
 review_df_subset = review_df.iloc[:5000]
 
-# Create a dictionary from the DataFrame
-abbreviation_mapping = dict(zip(abbreviation_mapping_df['Abbr'], abbreviation_mapping_df['Fullform']))
-
 # Function to find abbreviations using regex
 def find_abbreviations(s):
     return re.findall(r'\b[A-Z]{2,}\b', s)  # Ensure the regular expression pattern is balanced
@@ -49,17 +46,6 @@ def find_abbreviations(s):
 review_df_subset['abbreviations'] = review_df_subset['text'].apply(find_abbreviations)
 num_data_with_abbreviations = review_df_subset[review_df_subset['abbreviations'].apply(len) > 0].shape[0]
 
-#Function to replace abbreviations with their full forms
-def replace_abbreviations(text):
-    if pd.isna(text):  # Check if the text is NaN
-        return text  # Return NaN if it is NaN
-    for abbr, full_form in abbreviation_mapping.items():
-        if isinstance(abbr, str) and isinstance(full_form, str):  # Check if abbr and full_form are strings
-            text = text.replace(abbr, full_form)
-    return text
-
-# Apply the function to the 'text' column of the DataFrame
-review_df_subset['text'] = review_df_subset['text'].apply(replace_abbreviations)
 # Custom function to handle contractions
 contraction_map = {
     "ain't": "am not",
@@ -259,7 +245,6 @@ y = review_df_subset['sentiment']  # Sentiment labels
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
 # Step 2: Feature Extraction using TF-IDF
-#tfidf_vectorizer = TfidfVectorizer()
 X_train_tfidf = tfidf_vectorizer.fit_transform(X_train)
 X_test_tfidf = tfidf_vectorizer.transform(X_test)
 
@@ -418,6 +403,19 @@ print("Best parameters:", grid_search.best_params_)
 best_model = grid_search.best_estimator_
 accuracy = best_model.score(X_test, y_test)
 print("Accuracy on test set:", accuracy)
+
+# LIME Explanation
+pipeline = make_pipeline(tfidf_vectorizer, model)
+class_names = ['negative', 'positive','neutral']
+explainer = LimeTextExplainer(class_names=class_names)
+print(X_test.index)
+#index = [1501, 2586, 2653, 1055,  705,  106,  589, 2468, 2413, 1600]
+index=1000
+text = X_test.iloc[index]
+print(text)
+exp = explainer.explain_instance(text, pipeline.predict_proba, num_features=6)
+with open(f"data_{index}.html", "w") as file:
+    file.write(exp.as_html())
 
 # Perform PCA for dimensionality reduction
 pca = PCA(n_components=2)
