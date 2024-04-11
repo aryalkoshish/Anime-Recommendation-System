@@ -296,6 +296,9 @@ lda_topics = lda_model.fit_transform(tfidf_matrix)
 
 # Visualize topics with word clouds
 def visualize_topics(lda_model, feature_names, n_words=20):
+    num_topics = len(lda_model.components_)
+    n_cols = min(2, num_topics)  # Maximum of 2 columns
+    n_rows = -(-num_topics // n_cols)  # Ceiling division to determine rows
     for idx, topic in enumerate(lda_model.components_):
         # Get top words for each topic
         top_words_idx = topic.argsort()[:-n_words - 1:-1]
@@ -305,11 +308,14 @@ def visualize_topics(lda_model, feature_names, n_words=20):
         wordcloud = WordCloud(width=800, height=400, background_color='white').generate(' '.join(top_words))
 
         # Plot word cloud
-        plt.figure(figsize=(10, 5))
+        plt.subplot(n_rows, n_cols, idx + 1)
         plt.imshow(wordcloud, interpolation='bilinear')
         plt.title(f'Topic {idx + 1}')
         plt.axis('off')
-        plt.show()
+
+    # Show all word clouds
+    plt.tight_layout()
+    plt.show()
 
 # Visualize topics using word clouds
 visualize_topics(lda_model, tfidf_vectorizer.get_feature_names_out())
