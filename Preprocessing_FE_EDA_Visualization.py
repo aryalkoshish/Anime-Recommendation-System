@@ -6,7 +6,6 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
 import nltk
-from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from sklearn.decomposition import PCA, LatentDirichletAllocation
 from sklearn.manifold import TSNE
 from textblob import TextBlob
@@ -32,7 +31,6 @@ else:
 nltk.download('punkt')
 nltk.download('stopwords')
 nltk.download('wordnet')
-nltk.download('vader_lexicon')
 
 review_df = pd.read_csv('/Users/shweta/Downloads/Anime_3014/reviews.csv')
 abbreviation_mapping_df = pd.read_csv('/Users/shweta/Downloads/slangs.csv')
@@ -165,6 +163,9 @@ def preprocess_text(text):
     stop_words = set(stopwords.words('english'))
     tokens = [word for word in tokens if word not in stop_words]
 
+    stop_words = set(stopwords.words('spanish'))
+    tokens = [word for word in tokens if word not in stop_words]
+
     # Lemmatize the words to their base form
     lemmatizer = WordNetLemmatizer()
     tokens = [lemmatizer.lemmatize(word) for word in tokens]
@@ -174,9 +175,6 @@ def preprocess_text(text):
 
 # Apply preprocessing to the text column in your DataFrame
 review_df_subset['preprocessed_text'] = review_df_subset['text'].apply(preprocess_text)
-
-# Initialize the sentiment analyzer
-sid = SentimentIntensityAnalyzer()
 
 # Function to assign sentiment scores to each review
 def calculate_sentiment_score(text):
@@ -264,10 +262,10 @@ recall = recall_score(y_test, y_pred, average='weighted')
 f1 = f1_score(y_test, y_pred, average='weighted')
 
 # Print the evaluation metrics
-print("Accuracy:", accuracy)
-print("Precision:", precision)
-print("Recall:", recall)
-print("F1-score:", f1)
+print("Naive Bayes Accuracy:", accuracy)
+print("Naive Bayes Precision:", precision)
+print("Naive Bayes Recall:", recall)
+print("Naive Bayes F1-score:", f1)
 
 # Step 3: Choose Support Vector Machines (SVM) algorithm
 svm_model = SVC(kernel='linear')
@@ -322,7 +320,7 @@ visualize_topics(lda_model, tfidf_vectorizer.get_feature_names_out())
 
 # # Calculate average sentiment score for each topic
 topic_sentiment = []
-for topic_idx, topic in enumerate(lda_topics):
+for topic_idx, topic in enumerate(lda_topics[:10]):
     top_reviews_idx = topic.argsort()[-10:]  # Example: Top 10 reviews for each topic
     topic_reviews = review_df_subset.iloc[top_reviews_idx]
     avg_sentiment = topic_reviews['polarity'].mean()
@@ -354,7 +352,7 @@ def calculate_similarity(lda_model, feature_names, words_or_phrases):
     return np.array(similarities)
 
 # Example words or phrases for semantic relationship exploration
-words_or_phrases = ["action", "romance", "comedy", "drama"]
+words_or_phrases = ["action", "romance", "comedy", "drama","animation","judge","growth","sad","ambitious"]
 
 # Calculate similarities
 similarities = calculate_similarity(lda_model, tfidf_vectorizer.get_feature_names_out(), words_or_phrases)
@@ -377,11 +375,11 @@ best_params = grid_search.best_params_
 # Train the model with best hyperparameters
 svm_model = SVC(**best_params)
 svm_model.fit(X_train_tfidf, y_train)
-print("Best parameters:", grid_search.best_params_)
+print("Best parameters for SVM:", grid_search.best_params_)
 # Evaluate the performance of the model
 y_pred = svm_model.predict(X_test_tfidf)
 accuracy = accuracy_score(y_test, y_pred)
-print("Accuracy:", accuracy)
+print("Accuracy SVM:", accuracy)
 
 # Define the pipeline with TF-IDF vectorizer and Multinomial Naive Bayes classifier
 pipeline = Pipeline([
@@ -403,12 +401,12 @@ grid_search = GridSearchCV(pipeline, param_grid, cv=StratifiedKFold(n_splits=5, 
 grid_search.fit(X_train, y_train)
 
 # Print the best parameters found by the grid search
-print("Best parameters:", grid_search.best_params_)
+print("Best parameters Naive Bayes:", grid_search.best_params_)
 
 # Evaluate the best model on the test data
 best_model = grid_search.best_estimator_
 accuracy = best_model.score(X_test, y_test)
-print("Accuracy on test set:", accuracy)
+print("Accuracy on test set Naive Bayes:", accuracy)
 
 # LIME Explanation
 pipeline = make_pipeline(tfidf_vectorizer, model)
