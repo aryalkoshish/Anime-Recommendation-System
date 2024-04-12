@@ -6,9 +6,7 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
 import nltk
-from nltk.sentiment.vader import SentimentIntensityAnalyzer
-from sklearn.decomposition import PCA
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.decomposition import PCA, LatentDirichletAllocation
 from sklearn.manifold import TSNE
 from textblob import TextBlob
 from gensim.models import Word2Vec
@@ -18,7 +16,10 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.svm import SVC
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV,StratifiedKFold
+from wordcloud import WordCloud
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.pipeline import Pipeline
 
 try:
     _create_unverified_https_context = ssl._create_unverified_context
@@ -30,14 +31,10 @@ else:
 nltk.download('punkt')
 nltk.download('stopwords')
 nltk.download('wordnet')
-nltk.download('vader_lexicon')
 
 review_df = pd.read_csv('/Users/shweta/Downloads/Anime_3014/reviews.csv')
 abbreviation_mapping_df = pd.read_csv('/Users/shweta/Downloads/slangs.csv')
-review_df_subset = review_df.iloc[:15000]
-
-# Create a dictionary from the DataFrame
-abbreviation_mapping = dict(zip(abbreviation_mapping_df['Abbr'], abbreviation_mapping_df['Fullform']))
+review_df_subset = review_df.iloc[:5000]
 
 # Function to find abbreviations using regex
 def find_abbreviations(s):
@@ -47,17 +44,6 @@ def find_abbreviations(s):
 review_df_subset['abbreviations'] = review_df_subset['text'].apply(find_abbreviations)
 num_data_with_abbreviations = review_df_subset[review_df_subset['abbreviations'].apply(len) > 0].shape[0]
 
-#Function to replace abbreviations with their full forms
-def replace_abbreviations(text):
-    if pd.isna(text):  # Check if the text is NaN
-        return text  # Return NaN if it is NaN
-    for abbr, full_form in abbreviation_mapping.items():
-        if isinstance(abbr, str) and isinstance(full_form, str):  # Check if abbr and full_form are strings
-            text = text.replace(abbr, full_form)
-    return text
-
-# Apply the function to the 'text' column of the DataFrame
-review_df_subset['text'] = review_df_subset['text'].apply(replace_abbreviations)
 # Custom function to handle contractions
 contraction_map = {
     "ain't": "am not",
@@ -177,6 +163,9 @@ def preprocess_text(text):
     stop_words = set(stopwords.words('english'))
     tokens = [word for word in tokens if word not in stop_words]
 
+    stop_words = set(stopwords.words('spanish'))
+    tokens = [word for word in tokens if word not in stop_words]
+
     # Lemmatize the words to their base form
     lemmatizer = WordNetLemmatizer()
     tokens = [lemmatizer.lemmatize(word) for word in tokens]
@@ -186,9 +175,6 @@ def preprocess_text(text):
 
 # Apply preprocessing to the text column in your DataFrame
 review_df_subset['preprocessed_text'] = review_df_subset['text'].apply(preprocess_text)
-
-# Initialize the sentiment analyzer
-sid = SentimentIntensityAnalyzer()
 
 # Function to assign sentiment scores to each review
 def calculate_sentiment_score(text):
@@ -247,8 +233,193 @@ review_df_subset['polarity'], review_df_subset['subjectivity'] = zip(*review_df_
 review_df_subset['word_embeddings'] = review_df_subset['preprocessed_text'].apply(average_word_embedding)
 
 # Vectorize the text data using TF-IDF
-tfidf_vectorizer = TfidfVectorizer()
+tfidf_vectorizer = TfidfVectorizer(max_features=5000)
 tfidf_matrix = tfidf_vectorizer.fit_transform(review_df_subset['preprocessed_text'])
+
+
+# Step 1: Split the dataset into training and testing sets
+X = review_df_subset['preprocessed_text']  # Text data
+y = review_df_subset['sentiment']  # Sentiment labels
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Step 2: Feature Extraction using TF-IDF
+X_train_tfidf = tfidf_vectorizer.fit_transform(X_train)
+X_test_tfidf = tfidf_vectorizer.transform(X_test)
+
+# Step 3: Choose appropriate algorithm (Naive Bayes)
+model = MultinomialNB()
+
+# Step 4: Train the model
+model.fit(X_train_tfidf, y_train)
+
+# Step 5: Evaluate the performance of the model
+y_pred = model.predict(X_test_tfidf)
+
+# Calculate evaluation metrics
+accuracy = accuracy_score(y_test, y_pred)
+precision = precision_score(y_test, y_pred, average='weighted',zero_division=1)
+recall = recall_score(y_test, y_pred, average='weighted')
+f1 = f1_score(y_test, y_pred, average='weighted')
+
+# Print the evaluation metrics
+print("Naive Bayes Accuracy:", accuracy)
+print("Naive Bayes Precision:", precision)
+print("Naive Bayes Recall:", recall)
+print("Naive Bayes F1-score:", f1)
+
+# Step 3: Choose Support Vector Machines (SVM) algorithm
+svm_model = SVC(kernel='linear')
+
+# Step 4: Train the SVM model
+svm_model.fit(X_train_tfidf, y_train)
+
+# Step 5: Evaluate the performance of the model
+y_pred_svm = svm_model.predict(X_test_tfidf)
+
+# Calculate evaluation metrics
+accuracy_svm = accuracy_score(y_test, y_pred_svm)
+precision_svm = precision_score(y_test, y_pred_svm, average='weighted',zero_division=1)
+recall_svm = recall_score(y_test, y_pred_svm, average='weighted')
+f1_svm = f1_score(y_test, y_pred_svm, average='weighted')
+
+# Print the evaluation metrics for SVM
+print("SVM Accuracy:", accuracy_svm)
+print("SVM Precision:", precision_svm)
+print("SVM Recall:", recall_svm)
+print("SVM F1-score:", f1_svm)
+
+# Topic modeling with LDA
+lda_model = LatentDirichletAllocation(n_components=6, random_state=42)
+lda_topics = lda_model.fit_transform(tfidf_matrix)
+
+# Visualize topics with word clouds
+def visualize_topics(lda_model, feature_names, n_words=20):
+    num_topics = len(lda_model.components_)
+    n_cols = min(2, num_topics)  # Maximum of 2 columns
+    n_rows = -(-num_topics // n_cols)  # Ceiling division to determine rows
+    for idx, topic in enumerate(lda_model.components_):
+        # Get top words for each topic
+        top_words_idx = topic.argsort()[:-n_words - 1:-1]
+        top_words = [feature_names[i] for i in top_words_idx]
+
+        # Create word cloud for each topic
+        wordcloud = WordCloud(width=800, height=400, background_color='white').generate(' '.join(top_words))
+
+        # Plot word cloud
+        plt.subplot(n_rows, n_cols, idx + 1)
+        plt.imshow(wordcloud, interpolation='bilinear')
+        plt.title(f'Topic {idx + 1}')
+        plt.axis('off')
+
+    # Show all word clouds
+    plt.tight_layout()
+    plt.show()
+
+# Visualize topics using word clouds
+visualize_topics(lda_model, tfidf_vectorizer.get_feature_names_out())
+
+# # Calculate average sentiment score for each topic
+topic_sentiment = []
+for topic_idx, topic in enumerate(lda_topics[:10]):
+    top_reviews_idx = topic.argsort()[-10:]  # Example: Top 10 reviews for each topic
+    topic_reviews = review_df_subset.iloc[top_reviews_idx]
+    avg_sentiment = topic_reviews['polarity'].mean()
+    topic_sentiment.append(avg_sentiment)
+
+# Visualize sentiment scores for topics
+plt.figure(figsize=(8, 5))
+plt.bar(range(len(topic_sentiment)), topic_sentiment, color='skyblue')
+plt.xlabel('Topic')
+plt.ylabel('Average Sentiment Score')
+plt.title('Sentiment Scores for Topics')
+plt.xticks(range(len(topic_sentiment)), [f'Topic {i+1}' for i in range(len(topic_sentiment))])
+plt.show()
+
+def calculate_similarity(lda_model, feature_names, words_or_phrases):
+    similarities = []
+    # Iterate over each word or phrase
+    for word_or_phrase in words_or_phrases:
+        # Calculate cosine similarity with each topic
+        similarity_with_topics = []
+        for topic in lda_model.components_:
+            # Get top words for the topic
+            top_words_idx = topic.argsort()[:-len(topic) - 1:-1]
+            top_words = [feature_names[i] for i in top_words_idx]
+            # Calculate cosine similarity between word_or_phrase and top words of the topic
+            similarity = cosine_similarity([word2vec_model.wv[word_or_phrase]], [word2vec_model.wv[word] for word in top_words])
+            similarity_with_topics.append(similarity[0][0])  # Extracting the scalar value from the array
+        similarities.append(similarity_with_topics)
+    return np.array(similarities)
+
+# Example words or phrases for semantic relationship exploration
+words_or_phrases = ["action", "romance", "comedy", "drama","animation","judge","growth","sad","ambitious"]
+
+# Calculate similarities
+similarities = calculate_similarity(lda_model, tfidf_vectorizer.get_feature_names_out(), words_or_phrases)
+n_topics = 6
+# Visualize the semantic relationship using a heatmap
+
+plt.figure(figsize=(10, 6))
+sns.heatmap(similarities, annot=True, xticklabels=[f"Topic {i+1}" for i in range(n_topics)], yticklabels=words_or_phrases, cmap="YlGnBu")
+plt.title("Semantic Relationship between Words/Phrases and LDA Topics")
+plt.xlabel("LDA Topics")
+plt.ylabel("Words/Phrases")
+plt.show()
+
+#  Model Selection and Hyperparameter Tuning (SVM)
+param_grid = {'C': [0.1, 1, 10, 100], 'gamma': [1, 0.1, 0.01, 0.001], 'kernel': ['rbf', 'linear']}
+grid_search = GridSearchCV(SVC(), param_grid, cv=5)
+grid_search.fit(X_train_tfidf, y_train)
+best_params = grid_search.best_params_
+
+# Train the model with best hyperparameters
+svm_model = SVC(**best_params)
+svm_model.fit(X_train_tfidf, y_train)
+print("Best parameters for SVM:", grid_search.best_params_)
+# Evaluate the performance of the model
+y_pred = svm_model.predict(X_test_tfidf)
+accuracy = accuracy_score(y_test, y_pred)
+print("Accuracy SVM:", accuracy)
+
+# Define the pipeline with TF-IDF vectorizer and Multinomial Naive Bayes classifier
+pipeline = Pipeline([
+    ('tfidf', TfidfVectorizer()),
+    ('clf', MultinomialNB())
+])
+
+# Define parameter grid for grid search
+param_grid = {
+    'tfidf__max_features': [1000, 5000, 10000],  # Maximum number of features for TF-IDF vectorizer
+    'tfidf__ngram_range': [(1, 1), (1, 2)],       # N-gram range for TF-IDF vectorizer
+    'clf__alpha': [0.1, 0.5, 1.0],                # Alpha parameter for Multinomial Naive Bayes
+}
+
+# Initialize GridSearchCV with the pipeline, parameter grid, and cross-validation strategy
+grid_search = GridSearchCV(pipeline, param_grid, cv=StratifiedKFold(n_splits=5, shuffle=True), scoring='accuracy', verbose=1)
+
+# Fit the grid search to the training data
+grid_search.fit(X_train, y_train)
+
+# Print the best parameters found by the grid search
+print("Best parameters Naive Bayes:", grid_search.best_params_)
+
+# Evaluate the best model on the test data
+best_model = grid_search.best_estimator_
+accuracy = best_model.score(X_test, y_test)
+print("Accuracy on test set Naive Bayes:", accuracy)
+
+# LIME Explanation
+pipeline = make_pipeline(tfidf_vectorizer, model)
+class_names = ['negative', 'positive','neutral']
+explainer = LimeTextExplainer(class_names=class_names)
+print(X_test.index)
+#index = [1501, 2586, 2653, 1055,  705,  106,  589, 2468, 2413, 1600]
+index=1000
+text = X_test.iloc[index]
+print(text)
+exp = explainer.explain_instance(text, pipeline.predict_proba, num_features=6)
+with open(f"data_{index}.html", "w") as file:
+    file.write(exp.as_html())
 
 # Perform PCA for dimensionality reduction
 pca = PCA(n_components=2)
@@ -259,7 +430,7 @@ tsne = TSNE(n_components=2, perplexity=30, random_state=42)
 tsne_result = tsne.fit_transform(tfidf_matrix.toarray())
 
 # Define a color map for sentiments
-color_map = {'positive': 'blue', 'negative': 'red', 'neutral': 'green'}
+color_map = {'positive': 'Green', 'negative': 'red', 'neutral': 'Yellow'}
 
 # Plot PCA result
 plt.figure(figsize=(10, 5))
@@ -298,45 +469,4 @@ plt.title('Box Plot of Sentiment Scores')
 plt.ylabel('Sentiment Score')
 plt.show()
 
-X = review_df_subset['preprocessed_text']  # Text data
-y = review_df_subset['sentiment']  # Sentiment labels
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-tfidf_vectorizer = TfidfVectorizer(max_features=5000)
-X_train_tfidf = tfidf_vectorizer.fit_transform(X_train)
-X_test_tfidf = tfidf_vectorizer.transform(X_test)
-
-# Naive Bayes
-model = MultinomialNB()
-
-model.fit(X_train_tfidf, y_train)
-
-y_pred = model.predict(X_test_tfidf)
-
-accuracy = accuracy_score(y_test, y_pred)
-precision = precision_score(y_test, y_pred, average='weighted')
-recall = recall_score(y_test, y_pred, average='weighted')
-f1 = f1_score(y_test, y_pred, average='weighted')
-
-print("Accuracy:", accuracy)
-print("Precision:", precision)
-print("Recall:", recall)
-print("F1-score:", f1)
-
-# Support Vector Machines (SVM) algorithm
-svm_model = SVC(kernel='linear')
-
-svm_model.fit(X_train_tfidf, y_train)
-
-y_pred_svm = svm_model.predict(X_test_tfidf)
-
-accuracy_svm = accuracy_score(y_test, y_pred_svm)
-precision_svm = precision_score(y_test, y_pred_svm, average='weighted')
-recall_svm = recall_score(y_test, y_pred_svm, average='weighted')
-f1_svm = f1_score(y_test, y_pred_svm, average='weighted')
-
-print("SVM Accuracy:", accuracy_svm)
-print("SVM Precision:", precision_svm)
-print("SVM Recall:", recall_svm)
-print("SVM F1-score:", f1_svm)
 
